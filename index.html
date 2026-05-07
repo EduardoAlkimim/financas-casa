@@ -633,21 +633,17 @@
       </div>
 
       <div class="config-section">
-        <h3>Firebase</h3>
+        <h3>Status Firebase</h3>
         <div class="config-row">
-          <span>API Key</span>
-          <input class="config-input" id="cfgApiKey" placeholder="AIza..." />
+          <span>Projeto</span>
+          <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">financas-7008b</span>
         </div>
         <div class="config-row">
-          <span>Auth Domain</span>
-          <input class="config-input" id="cfgAuthDomain" placeholder="projeto.firebaseapp.com" />
+          <span>Conexão</span>
+          <span id="cfgFbStatus" class="tag">verificando...</span>
         </div>
-        <div class="config-row">
-          <span>Project ID</span>
-          <input class="config-input" id="cfgProjectId" placeholder="meu-projeto" />
-        </div>
-        <div class="config-row" style="border:none; padding-top:1rem; justify-content:flex-end">
-          <button class="btn primary" onclick="saveFirebaseConfig()">Salvar e conectar</button>
+        <div class="config-row" style="border:none;padding-top:0.75rem;justify-content:flex-end">
+          <button class="btn" onclick="window.manualSync()">🔄 Sincronizar agora</button>
         </div>
       </div>
 
@@ -729,7 +725,18 @@
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAERcu11bn3Fe_44ZCaA3IxXR9IRVi9cCA",
+  authDomain: "financas-7008b.firebaseapp.com",
+  projectId: "financas-7008b",
+  storageBucket: "financas-7008b.firebasestorage.app",
+  messagingSenderId: "306792714139",
+  appId: "1:306792714139:web:9aa518e5b92247cf94db3e",
+  measurementId: "G-ERJ41JPCY8"
+};
 
 // ========== STATE ==========
 const CATEGORIES = [
@@ -774,13 +781,6 @@ function loadLocal() {
     if (d) monthData = JSON.parse(d);
     const s = localStorage.getItem('fin_settings');
     if (s) settings = { ...settings, ...JSON.parse(s) };
-    const fb = localStorage.getItem('fin_firebase');
-    if (fb) {
-      const cfg = JSON.parse(fb);
-      $('cfgApiKey').value = cfg.apiKey || '';
-      $('cfgAuthDomain').value = cfg.authDomain || '';
-      $('cfgProjectId').value = cfg.projectId || '';
-    }
     $('cfgOrcamento').value = settings.orcamento || '';
   } catch(e) {}
 }
@@ -794,32 +794,18 @@ function saveSettings() {
 }
 
 // ========== FIREBASE ==========
-window.saveFirebaseConfig = async function() {
-  const cfg = {
-    apiKey: $('cfgApiKey').value.trim(),
-    authDomain: $('cfgAuthDomain').value.trim(),
-    projectId: $('cfgProjectId').value.trim(),
-    storageBucket: `${$('cfgProjectId').value.trim()}.appspot.com`,
-    messagingSenderId: "000000000000",
-    appId: "1:000000000000:web:000000"
-  };
-  if (!cfg.apiKey || !cfg.projectId) { toast('Preencha API Key e Project ID', 'err'); return; }
-  localStorage.setItem('fin_firebase', JSON.stringify(cfg));
-  await connectFirebase(cfg);
-};
-
-async function connectFirebase(cfg) {
+async function connectFirebase() {
   try {
-    fbApp = initializeApp(cfg, 'financas');
+    fbApp = initializeApp(FIREBASE_CONFIG);
     fbDb = getFirestore(fbApp);
+    try { getAnalytics(fbApp); } catch(e) {}
     $('fbDot').className = 'fb-dot ok';
     $('fbLabel').textContent = 'firebase conectado';
-    toast('Firebase conectado!');
     await syncFromFirebase();
   } catch(e) {
     $('fbDot').className = 'fb-dot err';
     $('fbLabel').textContent = 'erro firebase';
-    toast('Erro ao conectar Firebase', 'err');
+    console.error('Firebase error:', e);
   }
 }
 
@@ -838,8 +824,16 @@ async function syncFromFirebase() {
     saveLocal();
     render();
     toast('Dados sincronizados!');
+    const el = $('cfgFbStatus');
+    if (el) { el.textContent = 'conectado ✓'; el.style.background = 'rgba(76,175,125,0.15)'; el.style.color = '#4caf7d'; }
   } catch(e) { toast('Erro ao sincronizar', 'err'); }
 }
+
+window.manualSync = async function() {
+  if (!fbDb) { toast('Firebase não conectado', 'err'); return; }
+  toast('Sincronizando...');
+  await syncFromFirebase();
+};
 
 // ========== MONTH DATA HELPERS ==========
 function getMonthObj(k) {
@@ -1182,11 +1176,7 @@ window.clearLocalData = function() {
 async function init() {
   loadLocal();
   render();
-
-  const fbCfg = localStorage.getItem('fin_firebase');
-  if (fbCfg) {
-    try { await connectFirebase(JSON.parse(fbCfg)); } catch(e) {}
-  }
+  await connectFirebase();
 }
 
 init();
