@@ -105,6 +105,23 @@
     .del-row-btn { width: 22px; height: 22px; border-radius: 5px; border: 1px solid transparent; background: none; color: #555; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
     .del-row-btn:hover { background: var(--danger-dim); color: var(--danger); border-color: rgba(255,95,87,0.3); }
 
+    /* botões de ação por linha */
+    .row-actions { display: flex; align-items: center; gap: 4px; }
+    .action-btn { width: 24px; height: 24px; border-radius: 5px; border: 1px solid transparent; background: none; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; color: #555; }
+    .action-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+    /* pago */
+    .action-btn.pago { color: var(--success); border-color: rgba(76,175,125,0.35); background: var(--success-dim); }
+    .action-btn.pago:hover { background: rgba(76,175,125,0.22); }
+    /* fixar valor */
+    .action-btn.pinned { color: var(--warning); border-color: rgba(255,179,71,0.35); background: var(--warning-dim); }
+    .action-btn.pinned:hover { background: rgba(255,179,71,0.22); }
+    /* linha paga */
+    tr.row-pago td { opacity: 0.45; }
+    tr.row-pago td:first-child { opacity: 1; }
+    tr.row-pago .row-paid-badge { display: inline-flex; }
+    .row-paid-badge { display: none; font-size: 9px; padding: 1px 7px; border-radius: 99px; background: var(--success-dim); color: var(--success); border: 1px solid rgba(76,175,125,0.3); font-weight: 600; margin-left: 4px; vertical-align: middle; }
+    .row-pinned-badge { font-size: 9px; padding: 1px 7px; border-radius: 99px; background: var(--warning-dim); color: var(--warning); border: 1px solid rgba(255,179,71,0.3); font-weight: 600; margin-left: 4px; vertical-align: middle; }
+
     /* MODAL */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
     .modal-overlay.open { display: flex; }
@@ -269,7 +286,7 @@
               <th>Categoria</th>
               <th class="right">Valor</th>
               <th class="bar-col">Proporção</th>
-              <th style="width:32px"></th>
+              <th class="right" style="width:100px;padding-right:14px">Ações</th>
             </tr>
           </thead>
           <tbody id="tableBody"></tbody>
@@ -458,6 +475,9 @@ let fbApp = null, fbDb = null;
 let editingInstId = null;
 let settings = { orcamento: 0 };
 let repeatMode = 'single';
+// catMeta: metadados por categoria — { [cat]: { pinned: true, pinnedValue: 100.00 } }
+// Independente do mês, é persistido em localStorage separado
+let catMeta = {};
 
 const $ = id => document.getElementById(id);
 const monthKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -496,6 +516,7 @@ function loadLocal() {
     const d = localStorage.getItem('fin_data'); if(d) monthData = JSON.parse(d);
     const s = localStorage.getItem('fin_settings'); if(s) settings = {...settings,...JSON.parse(s)};
     const c = localStorage.getItem('fin_custom_cats'); if(c) customCats = JSON.parse(c);
+    const m = localStorage.getItem('fin_cat_meta'); if(m) catMeta = JSON.parse(m);
     $('cfgOrcamento').value = settings.orcamento || '';
   } catch(e) { console.warn('[loadLocal] erro ao carregar dados locais:', e); }
 }
@@ -508,6 +529,9 @@ function saveSettings() {
 }
 function saveCustomCats() {
   try { localStorage.setItem('fin_custom_cats', JSON.stringify(customCats)); } catch(e) { console.warn('[saveCustomCats]', e); }
+}
+function saveCatMeta() {
+  try { localStorage.setItem('fin_cat_meta', JSON.stringify(catMeta)); } catch(e) { console.warn('[saveCatMeta]', e); }
 }
 
 // ---- FIREBASE ----
@@ -602,9 +626,63 @@ function setGasto(cat, val) {
   if(!val || isNaN(val) || val === 0) delete obj.gastos[cat];
   else obj.gastos[cat] = parseFloat(val);
   saveLocal();
-  syncToFirebase(k); // fire-and-forget intencional (UX não deve bloquear)
+  syncToFirebase(k);
   updateSummary();
   updateBars();
+}
+
+// Marca/desmarca uma categoria como paga no mês atual
+window.togglePago = function(cat) {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  if(!obj.pago) obj.pago = {};
+  obj.pago[cat] = !obj.pago[cat];
+  if(!obj.pago[cat]) delete obj.pago[cat];
+  saveLocal();
+  syncToFirebase(k);
+  render();
+};
+
+// Fixa/desfixa o valor atual de uma categoria para se repetir todo mês
+window.togglePin = function(cat) {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  const val = obj.gastos[cat] || 0;
+
+  if(catMeta[cat]?.pinned) {
+    // desafixar
+    delete catMeta[cat];
+    saveCatMeta();
+    toast(`Valor fixo de "${cat}" removido`, 'warn');
+  } else {
+    if(!val || val === 0) {
+      toast('Digite um valor antes de fixar', 'err');
+      return;
+    }
+    if(!catMeta[cat]) catMeta[cat] = {};
+    catMeta[cat].pinned = true;
+    catMeta[cat].pinnedValue = val;
+    saveCatMeta();
+    toast(`✅ "${cat}" fixada em ${fmtBRL(val)} todo mês`);
+  }
+  render();
+};
+
+// Ao mudar de mês, preenche automaticamente categorias com valor fixado
+// caso o mês ainda não tenha valor para elas
+function autoFillPinned() {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  let changed = false;
+  Object.keys(catMeta).forEach(cat => {
+    if(catMeta[cat]?.pinned && catMeta[cat].pinnedValue > 0) {
+      if(!obj.gastos[cat]) {
+        obj.gastos[cat] = catMeta[cat].pinnedValue;
+        changed = true;
+      }
+    }
+  });
+  if(changed) { saveLocal(); syncToFirebase(k); }
 }
 
 function getTotalGastos(k) {
@@ -618,6 +696,7 @@ function getParcelasThisMonth(k) {
 // ---- NAVIGATION ----
 window.changeMonth = function(dir) {
   currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+dir, 1);
+  autoFillPinned();
   render();
 };
 
