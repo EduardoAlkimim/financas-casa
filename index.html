@@ -107,13 +107,13 @@
 
     /* botões de ação por linha */
     .row-actions { display: flex; align-items: center; gap: 4px; }
-    .action-btn { width: 24px; height: 24px; border-radius: 5px; border: 1px solid transparent; background: none; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; color: #555; }
-    .action-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+    .action-btn { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border2); background: var(--surface2); cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; color: var(--muted); }
+    .action-btn:hover { background: var(--surface); color: var(--text); border-color: rgba(255,255,255,0.2); }
     /* pago */
-    .action-btn.pago { color: var(--success); border-color: rgba(76,175,125,0.35); background: var(--success-dim); }
+    .action-btn.pago { color: var(--success); border-color: rgba(76,175,125,0.45); background: var(--success-dim); }
     .action-btn.pago:hover { background: rgba(76,175,125,0.22); }
     /* fixar valor */
-    .action-btn.pinned { color: var(--warning); border-color: rgba(255,179,71,0.35); background: var(--warning-dim); }
+    .action-btn.pinned { color: var(--warning); border-color: rgba(255,179,71,0.45); background: var(--warning-dim); }
     .action-btn.pinned:hover { background: rgba(255,179,71,0.22); }
     /* linha paga */
     tr.row-pago td { opacity: 0.45; }
@@ -814,6 +814,7 @@ function render() {
   $('monthLabel').textContent = fmtMonth(currentDate);
   $('actionMonth').textContent = fmtMonthLong(currentDate);
   const obj = getMonthObj(k);
+  if(!obj.pago) obj.pago = {};
   const allCats = getCategoriesForMonth(k);
   const total = getTotalGastos(k);
   const tbody = $('tableBody');
@@ -827,6 +828,8 @@ function render() {
     const f = customCats[cat];
     const isFixed = isCustom && f.endKey === FIXED_END_KEY;
     const isRepeat = isCustom && !isFixed && f.startKey !== f.endKey;
+    const isPago = !!(obj.pago && obj.pago[cat]);
+    const isPinned = !!(catMeta[cat]?.pinned);
 
     const badges = [
       isFixed ? '<span class="fixed-tag">📌 fixa</span>' : '',
@@ -835,22 +838,48 @@ function render() {
     ].filter(Boolean).join(' ');
 
     const catDisplay = badges
-      ? `<div style="display:flex;flex-direction:column;gap:3px"><span>${cat}</span><div style="display:flex;gap:4px;margin-top:1px">${badges}</div></div>`
-      : cat;
+      ? `<div style="display:flex;flex-direction:column;gap:3px"><span>${cat}<span class="row-paid-badge">✓ pago</span></span><div style="display:flex;gap:4px;margin-top:1px">${badges}</div></div>`
+      : `<span>${cat}<span class="row-paid-badge">✓ pago</span></span>`;
 
-    const delBtn = isCustom
-      ? `<td><button class="del-row-btn" title="Remover categoria" onclick="window.removeCustomCat('${cat.replace(/'/g,"\\'")}')">×</button></td>`
-      : `<td></td>`;
+    const catEsc = cat.replace(/'/g,"\\'");
+
+    // botão pago
+    const btnPago = `<button
+      class="action-btn${isPago?' pago':''}"
+      title="${isPago?'Marcar como não pago':'Marcar como pago'}"
+      onclick="window.togglePago('${catEsc}')"
+    >${isPago?'✓':'○'}</button>`;
+
+    // botão fixar valor
+    const btnPin = `<button
+      class="action-btn${isPinned?' pinned':''}"
+      title="${isPinned?`Desafixar valor (${fmtBRL(catMeta[cat].pinnedValue)}/mês)`:'Fixar valor para todo mês'}"
+      onclick="window.togglePin('${catEsc}')"
+    >${isPinned?'📌':'⊙'}</button>`;
+
+    // botão remover (só custom)
+    const btnDel = isCustom
+      ? `<button class="action-btn" title="Remover categoria" style="color:#555" onclick="window.removeCustomCat('${catEsc}')">×</button>`
+      : '';
 
     const tr = document.createElement('tr');
+    if(isPago) tr.className = 'row-pago';
+
     tr.innerHTML = `
       <td><div class="cat-name"><div class="cat-pill" style="background:${color}"></div>${catDisplay}</div></td>
-      <td class="right">
-        <input class="value-input" type="number" step="0.01" min="0"
-          value="${val>0?val:''}" placeholder="R$ 0,00"
-          data-cat="${cat}"
-          onchange="window.onGastoChange(this)"
-          onblur="window.onGastoChange(this)" />
+      <td class="right" style="position:relative">
+        <div style="display:inline-flex;align-items:center;gap:4px;justify-content:flex-end">
+          <div style="position:relative;display:inline-block">
+            <input class="value-input" type="number" step="0.01" min="0"
+              value="${val>0?val:''}"
+              data-cat="${cat}"
+              ${isPinned?`title="Valor fixado em ${fmtBRL(catMeta[cat].pinnedValue)} — edite para alterar"`:'' }
+              onchange="window.onGastoChange(this)"
+              onblur="window.onGastoChange(this)" />
+            ${val<=0?`<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:14px;color:#444;pointer-events:none">R$ 0,00</span>`:''}
+          </div>
+          ${isPinned?`<span class="row-pinned-badge" title="Valor fixado todo mês">📌</span>`:''}
+        </div>
       </td>
       <td class="bar-col">
         <div class="bar-wrap">
@@ -858,7 +887,11 @@ function render() {
           <span class="bar-pct">${pct}%</span>
         </div>
       </td>
-      ${delBtn}
+      <td style="padding:6px 10px 6px 4px;white-space:nowrap">
+        <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+          ${btnPago}${btnPin}${btnDel}
+        </div>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -881,7 +914,8 @@ function updateSummary() {
   const saldo = orc - total;
 
   $('sumTotal').textContent = fmtBRL(total);
-  $('sumCats').textContent = `${filled} de ${allCats.length} categorias`;
+  const pagos = Object.keys(obj.pago||{}).filter(c=>obj.pago[c]).length;
+  $('sumCats').textContent = `${filled} preenchidas${pagos>0?' · '+pagos+' pagas':''} / ${allCats.length}`;
   $('sumOrc').textContent = orc>0 ? fmtBRL(orc) : 'R$ —';
   $('sumOrcSub').textContent = orc>0 ? (total/orc*100).toFixed(0)+'% usado' : 'defina em Config';
   $('footTotal').textContent = fmtBRL(total);
@@ -1067,14 +1101,17 @@ window.clearLocalData = function() {
   if(!confirm('Apagar TODOS os dados locais?')) return;
   localStorage.removeItem('fin_data');
   localStorage.removeItem('fin_custom_cats');
+  localStorage.removeItem('fin_cat_meta');
   monthData = {};
   customCats = {};
+  catMeta = {};
   render();
   toast('Dados apagados!');
 };
 
 async function init() {
   loadLocal();
+  autoFillPinned();
   render();
   await connectFirebase();
 }
