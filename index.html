@@ -545,13 +545,72 @@ async function loadAllFromFirebase() {
   monthData = {};
   col.forEach(d => { monthData[d.id] = d.data(); });
 
-  // Carrega configurações globais (catMeta, customCats, settings)
+  // Tenta carregar configurações no formato NOVO (configuracoes/global)
   const cfgSnap = await getDoc(doc(fbDb, 'configuracoes', 'global'));
   if(cfgSnap.exists()) {
     const cfg = cfgSnap.data();
     catMeta    = cfg.catMeta    || {};
     customCats = cfg.customCats || {};
     settings   = cfg.settings   || { orcamento: 0 };
+  } else {
+    // ── MIGRAÇÃO: formato antigo ──────────────────────────────────────
+    // O código anterior salvava catMeta em 'configuracoes/catMeta'
+    // e customCats/settings só no localStorage.
+    // Aqui lemos o que existir no Firebase antigo e consolidamos.
+    $('loadingText').textContent = 'Migrando dados antigos...';
+    console.info('[migração] configuracoes/global não encontrado — verificando formato antigo...');
+
+    let migratedSomething = false;
+
+    // 1. catMeta antigo (configuracoes/catMeta)
+    try {
+      const oldMeta = await getDoc(doc(fbDb, 'configuracoes', 'catMeta'));
+      if(oldMeta.exists()) {
+        catMeta = oldMeta.data() || {};
+        console.info('[migração] catMeta antigo encontrado:', catMeta);
+        migratedSomething = true;
+      }
+    } catch(e) { console.warn('[migração] erro ao ler catMeta antigo:', e); }
+
+    // 2. fin_custom_cats do localStorage (pode existir no browser atual)
+    try {
+      const lsCustom = localStorage.getItem('fin_custom_cats');
+      if(lsCustom) {
+        customCats = JSON.parse(lsCustom);
+        console.info('[migração] customCats do localStorage:', customCats);
+        migratedSomething = true;
+      }
+    } catch(e) {}
+
+    // 3. fin_settings do localStorage
+    try {
+      const lsSettings = localStorage.getItem('fin_settings');
+      if(lsSettings) {
+        settings = { ...settings, ...JSON.parse(lsSettings) };
+        console.info('[migração] settings do localStorage:', settings);
+        migratedSomething = true;
+      }
+    } catch(e) {}
+
+    // 4. fin_cat_meta do localStorage (pode ter mais info que o Firebase)
+    try {
+      const lsMeta = localStorage.getItem('fin_cat_meta');
+      if(lsMeta) {
+        const parsed = JSON.parse(lsMeta);
+        // merge: Firebase tem prioridade, mas preenche o que faltar
+        catMeta = { ...parsed, ...catMeta };
+        console.info('[migração] catMeta do localStorage merged:', catMeta);
+        migratedSomething = true;
+      }
+    } catch(e) {}
+
+    // Salva no novo formato para que a próxima carga use o caminho correto
+    if(migratedSomething) {
+      console.info('[migração] salvando no novo formato configuracoes/global...');
+      await saveConfigToFirebase();
+      toast('✅ Dados migrados para nova estrutura!');
+    }
+    // ─────────────────────────────────────────────────────────────────
   }
 
   $('cfgOrcamento').value = settings.orcamento || '';
