@@ -243,4 +243,1030 @@
       /* esconde tabela, mostra cards */
       .table-wrap { display: none; }
       .cat-cards { display: flex; }
-  
+      .inst-progress { display: none; }
+      .toggle-options { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>💰 Finanças</h1>
+      <p>controle mensal</p>
+    </div>
+    <div class="sidebar-section">
+      <label>Mês</label>
+      <div class="month-nav">
+        <button onclick="window.changeMonth(-1)">‹</button>
+        <span class="month-label" id="monthLabel">—</span>
+        <button onclick="window.changeMonth(1)">›</button>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <label>Seções</label>
+      <div class="view-tabs">
+        <button class="tab-btn active" onclick="window.showPage('gastos')" data-page="gastos"><span class="icon">📋</span> Gastos</button>
+        <button class="tab-btn" onclick="window.showPage('parcelas')" data-page="parcelas"><span class="icon">🔄</span> Parcelamentos</button>
+        <button class="tab-btn" onclick="window.showPage('historico')" data-page="historico"><span class="icon">📅</span> Histórico</button>
+        <button class="tab-btn" onclick="window.showPage('config')" data-page="config"><span class="icon">⚙️</span> Config</button>
+      </div>
+    </div>
+    <div class="fb-indicator">
+      <div class="fb-dot loading" id="fbDot"></div>
+      <span id="fbLabel">conectando...</span>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- GASTOS -->
+    <div class="page active" id="page-gastos">
+      <div class="summary-grid">
+        <div class="s-card">
+          <div class="s-label">total gasto</div>
+          <div class="s-value red" id="sumTotal">R$ 0,00</div>
+          <div class="s-sub" id="sumCats">0 categorias</div>
+        </div>
+        <div class="s-card">
+          <div class="s-label">orçamento</div>
+          <div class="s-value" id="sumOrc">R$ —</div>
+          <div class="s-sub" id="sumOrcSub">não definido</div>
+        </div>
+        <div class="s-card">
+          <div class="s-label">saldo</div>
+          <div class="s-value" id="sumSaldo">—</div>
+          <div class="s-sub" id="sumSaldoSub"> </div>
+        </div>
+        <div class="s-card">
+          <div class="s-label">parcelas ativas</div>
+          <div class="s-value yellow" id="sumParcelas">R$ 0,00</div>
+          <div class="s-sub" id="sumParcelasSub">este mês</div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <h2>Categorias — <span id="actionMonth"></span></h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" onclick="window.openAddCatModal()">+ Categoria</button>
+          <button class="btn" onclick="window.clearAll()">🗑 Limpar tudo</button>
+        </div>
+      </div>
+
+      <div class="table-controls">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="searchInput" type="text" placeholder="Buscar categoria..." oninput="window.applyFilters()" />
+        </div>
+        <button class="sort-btn" id="sortVencBtn" onclick="window.toggleSortVenc()" title="Ordenar por dia de vencimento">
+          📅 Ordenar por vencimento
+        </button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Categoria</th>
+              <th class="right">Valor</th>
+              <th style="text-align:center;width:90px">Vencimento</th>
+              <th class="bar-col">Proporção</th>
+              <th class="right" style="width:100px;padding-right:14px">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td class="right mono" id="footTotal">R$ 0,00</td>
+              <td></td>
+              <td class="bar-col"></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Cards para mobile -->
+      <div class="cat-cards" id="catCards"></div>
+    </div>
+
+    <!-- PARCELAS -->
+    <div class="page" id="page-parcelas">
+      <div class="action-bar">
+        <h2>Parcelamentos</h2>
+        <button class="btn primary" onclick="window.openInstModal()">+ Adicionar</button>
+      </div>
+      <div class="installments-list" id="instList">
+        <div class="empty"><div class="empty-icon">🔄</div><p>Nenhum parcelamento cadastrado ainda.</p></div>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="page" id="page-historico">
+      <div class="action-bar"><h2>Histórico de meses</h2></div>
+      <div class="history-grid" id="histGrid">
+        <div class="empty" style="grid-column:1/-1"><div class="empty-icon">📅</div><p>Nenhum dado registrado ainda.</p></div>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="page" id="page-config">
+      <div class="action-bar"><h2>Configurações</h2></div>
+      <div class="config-section">
+        <h3>Status Firebase</h3>
+        <div class="config-row"><span>Projeto</span><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">financas-7008b</span></div>
+        <div class="config-row"><span>Conexão</span><span id="cfgFbStatus" class="tag">verificando...</span></div>
+        <div class="config-row" style="border:none;padding-top:0.75rem;justify-content:flex-end"><button class="btn" onclick="window.manualSync()">🔄 Sincronizar agora</button></div>
+      </div>
+      <div class="config-section">
+        <h3>Orçamento Mensal</h3>
+        <div class="config-row"><span>Limite mensal (R$)</span><input class="config-input" id="cfgOrcamento" type="number" placeholder="0,00" step="0.01" /></div>
+        <div class="config-row" style="border:none;padding-top:1rem;justify-content:flex-end"><button class="btn primary" onclick="window.saveOrcamento()">Salvar</button></div>
+      </div>
+      <div class="config-section">
+        <h3>Categorias</h3>
+        <div class="config-row"><span>Padrão</span><span class="tag" id="cfgCatDefault">19 categorias</span></div>
+        <div class="config-row"><span>Customizadas</span><span class="tag" id="cfgCatCustom">0 categorias</span></div>
+      </div>
+      <div class="config-section">
+        <h3>Dados</h3>
+        <div class="config-row"><span>Exportar para CSV</span><button class="btn" onclick="window.exportCSV()">📥 Exportar</button></div>
+        <div class="config-row"><span>Limpar dados locais</span><button class="btn danger-btn" onclick="window.clearLocalData()">⚠️ Limpar</button></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal: Nova Categoria -->
+<div class="modal-overlay" id="addCatModal">
+  <div class="modal">
+    <h3>Nova Categoria</h3>
+    <div class="modal-sub">Adicione uma categoria extra para este mês, para os próximos meses, ou fixe ela permanentemente.</div>
+
+    <div class="field">
+      <label>Nome da categoria</label>
+      <input id="newCatName" type="text" placeholder="Ex: Academia, Netflix, Combustível..." oninput="window.updateMonthsPreview()" />
+    </div>
+
+    <div class="field">
+      <label>Como ela deve aparecer?</label>
+      <div class="toggle-options">
+        <div class="toggle-opt selected" id="optSingle" onclick="window.selectRepeat('single')">
+          <span class="opt-icon">📅</span>
+          <div class="opt-label">Só este mês</div>
+          <div class="opt-sub">apenas <span id="optSingleLabel">—</span></div>
+        </div>
+        <div class="toggle-opt" id="optRepeat" onclick="window.selectRepeat('repeat')">
+          <span class="opt-icon">🔁</span>
+          <div class="opt-label">Repetir</div>
+          <div class="opt-sub">próximos meses</div>
+        </div>
+        <div class="toggle-opt" id="optFixed" onclick="window.selectRepeat('fixed')">
+          <span class="opt-icon">📌</span>
+          <div class="opt-label">Fixa</div>
+          <div class="opt-sub">sempre aparece</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- só aparece se repetir -->
+    <div id="repeatOptions" style="display:none">
+      <div class="field">
+        <label>Por quantos meses? (incluindo este)</label>
+        <input id="newCatMonths" type="number" min="2" max="24" value="5" oninput="window.updateMonthsPreview()" />
+      </div>
+      <div class="months-preview" id="monthsPreview">
+        <div class="months-preview-label">Será adicionada nos meses:</div>
+        <div class="months-chips" id="monthsChips"></div>
+      </div>
+    </div>
+
+    <!-- só aparece se fixa -->
+    <div id="fixedOptions" style="display:none">
+      <div class="fixed-info-box">
+        📌 Categoria <strong>fixa</strong> — vai aparecer em <strong>todos os meses</strong>, sem data de fim, igual às categorias padrão. Para remover, use o botão × na tabela.
+      </div>
+      <div class="months-preview" style="margin-top:8px">
+        <div class="months-preview-label">
+          <span>Exemplos de meses com a categoria:</span>
+          <span class="fixed-tag">📌 FIXA</span>
+        </div>
+        <div class="months-chips" id="fixedChips"></div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="window.closeAddCatModal()">Cancelar</button>
+      <button class="btn primary" onclick="window.confirmAddCat()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Parcelamento -->
+<div class="modal-overlay" id="instModal">
+  <div class="modal">
+    <h3 id="modalTitle">Novo Parcelamento</h3>
+    <div class="field"><label>Nome / Descrição</label><input id="instName" type="text" placeholder="Ex: Notebook Samsung" /></div>
+    <div class="field"><label>Valor total (R$)</label><input id="instTotal" type="number" step="0.01" placeholder="1200,00" /></div>
+    <div class="field"><label>Número de parcelas</label><input id="instQtd" type="number" min="1" max="120" placeholder="12" /></div>
+    <div class="field"><label>Parcela atual (nº)</label><input id="instAtual" type="number" min="1" placeholder="1" /></div>
+    <div class="field"><label>Categoria (para débito automático)</label><select id="instCat"><option value="">— Nenhuma —</option></select></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="window.closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="window.saveInstallment()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAERcu11bn3Fe_44ZCaA3IxXR9IRVi9cCA",
+  authDomain: "financas-7008b.firebaseapp.com",
+  projectId: "financas-7008b",
+  storageBucket: "financas-7008b.firebasestorage.app",
+  messagingSenderId: "306792714139",
+  appId: "1:306792714139:web:9aa518e5b92247cf94db3e",
+  measurementId: "G-ERJ41JPCY8"
+};
+
+const DEFAULT_CATEGORIES = [
+  "BRADESCO C&A","BRADESCO CASSIA","INTERNET","INTER HEIDER",
+  "INTER CASSIA","C&A VIRTUAL","MARIZA","PERNAMBUCANA",
+  "POLO","POLLIELY","RIACHUELO","RENNER","ATACADÃO",
+  "CARREFOUR","ÁGUA","ENERGIA","IPVA UP","IPTU","PLANO SAÚDE"
+];
+
+const COLORS = [
+  "#c8f55a","#5b9cf6","#ff9f43","#ee5a24","#1dd1a1",
+  "#fd79a8","#a29bfe","#00cec9","#fdcb6e","#e17055",
+  "#74b9ff","#55efc4","#ffeaa7","#dfe6e9","#b2bec3",
+  "#81ecec","#fab1a0","#636e72","#6c5ce7",
+  "#ff6b9d","#c44dff","#00d2ff","#f9ca24","#6ab04c",
+  "#eb4d4b","#686de0","#30336b","#22a6b3","#be2edd"
+];
+
+// FIXED_END_KEY = categoria sem fim definido (fixa permanente)
+const FIXED_END_KEY = '9999-12';
+
+// customCats: { catName: { startKey, endKey } }
+let customCats = {};
+let currentDate = new Date();
+let monthData = {};
+let fbApp = null, fbDb = null;
+let editingInstId = null;
+let settings = { orcamento: 0 };
+let repeatMode = 'single';
+// catMeta: metadados por categoria — { [cat]: { pinned: true, pinnedValue: 100.00 } }
+// Independente do mês, é persistido em localStorage separado
+let catMeta = {};
+let sortVenc = false;    // se true, ordena por dia de vencimento
+let searchQuery = '';    // filtro de busca ativo
+
+const $ = id => document.getElementById(id);
+const monthKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+const fmtBRL = v => (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtMonth = d => d.toLocaleDateString('pt-BR',{month:'short',year:'numeric'});
+const fmtMonthLong = d => d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+const fmtMonthShort = d => d.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
+
+function toast(msg, type='ok') {
+  const t=$('toast'); t.textContent=msg; t.className=`toast show ${type}`;
+  setTimeout(()=>t.className='toast',2800);
+}
+
+function setFbStatus(state) {
+  const dot = $('fbDot');
+  const label = $('fbLabel');
+  const cfg = $('cfgFbStatus');
+  if(state === 'ok') {
+    dot.className = 'fb-dot ok';
+    label.textContent = 'firebase conectado';
+    if(cfg){ cfg.textContent='conectado ✓'; cfg.style.background='rgba(76,175,125,0.15)'; cfg.style.color='#4caf7d'; }
+  } else if(state === 'err') {
+    dot.className = 'fb-dot err';
+    label.textContent = 'erro firebase';
+    if(cfg){ cfg.textContent='erro de conexão'; cfg.style.background='rgba(255,95,87,0.12)'; cfg.style.color='var(--danger)'; }
+  } else {
+    dot.className = 'fb-dot loading';
+    label.textContent = 'conectando...';
+    if(cfg){ cfg.textContent='verificando...'; cfg.style.background=''; cfg.style.color=''; }
+  }
+}
+
+// ---- LOCAL STORAGE ----
+function loadLocal() {
+  try {
+    const d = localStorage.getItem('fin_data'); if(d) monthData = JSON.parse(d);
+    const s = localStorage.getItem('fin_settings'); if(s) settings = {...settings,...JSON.parse(s)};
+    const c = localStorage.getItem('fin_custom_cats'); if(c) customCats = JSON.parse(c);
+    const m = localStorage.getItem('fin_cat_meta'); if(m) catMeta = JSON.parse(m);
+    $('cfgOrcamento').value = settings.orcamento || '';
+  } catch(e) { console.warn('[loadLocal] erro ao carregar dados locais:', e); }
+}
+
+function saveLocal() {
+  try { localStorage.setItem('fin_data', JSON.stringify(monthData)); } catch(e) { console.warn('[saveLocal]', e); }
+}
+function saveSettings() {
+  try { localStorage.setItem('fin_settings', JSON.stringify(settings)); } catch(e) { console.warn('[saveSettings]', e); }
+}
+function saveCustomCats() {
+  try { localStorage.setItem('fin_custom_cats', JSON.stringify(customCats)); } catch(e) { console.warn('[saveCustomCats]', e); }
+}
+function saveCatMeta() {
+  try { localStorage.setItem('fin_cat_meta', JSON.stringify(catMeta)); } catch(e) { console.warn('[saveCatMeta]', e); }
+  syncCatMetaToFirebase(); // sempre sincroniza com Firebase ao salvar
+}
+
+async function syncCatMetaToFirebase() {
+  if(!fbDb) return;
+  try {
+    await setDoc(doc(fbDb, 'configuracoes', 'catMeta'), sanitizeForFirestore(catMeta), { merge: false });
+  } catch(e) {
+    console.error('[syncCatMetaToFirebase] erro:', e);
+  }
+}
+
+// ---- FIREBASE ----
+// Garante que o objeto do mês está limpo antes de salvar no Firestore
+// (Firestore rejeita undefined, então usamos JSON parse/stringify para higienizar)
+function sanitizeForFirestore(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+async function connectFirebase() {
+  setFbStatus('loading');
+  try {
+    fbApp = initializeApp(FIREBASE_CONFIG);
+    fbDb = getFirestore(fbApp);
+    try { getAnalytics(fbApp); } catch(e) {}
+    setFbStatus('ok');
+    await syncFromFirebase();
+  } catch(e) {
+    console.error('[connectFirebase] erro:', e);
+    setFbStatus('err');
+    toast('Firebase indisponível — usando dados locais', 'warn');
+  }
+}
+
+// Salva UM mês no Firestore.
+// Usa merge:true para não sobrescrever campos que possam existir no servidor
+// e não foram carregados nesta sessão.
+async function syncToFirebase(key) {
+  if(!fbDb) return;
+  try {
+    const data = sanitizeForFirestore(getMonthObj(key));
+    await setDoc(doc(fbDb, 'financas', key), data, { merge: true });
+  } catch(e) {
+    console.error('[syncToFirebase] erro ao salvar mês', key, e);
+    toast('Erro ao salvar no Firebase', 'err');
+  }
+}
+
+// Faz merge inteligente: Firebase tem prioridade sobre localStorage,
+// mas preserva chaves locais que não existam no servidor ainda.
+async function syncFromFirebase() {
+  if(!fbDb) return;
+  try {
+    // carrega dados mensais
+    const col = await getDocs(collection(fbDb, 'financas'));
+    col.forEach(d => {
+      monthData[d.id] = { ...monthData[d.id], ...d.data() };
+    });
+    // carrega catMeta (vencimentos, valores fixados)
+    const metaDoc = await getDoc(doc(fbDb, 'configuracoes', 'catMeta'));
+    if(metaDoc.exists()) {
+      catMeta = { ...catMeta, ...metaDoc.data() };
+      try { localStorage.setItem('fin_cat_meta', JSON.stringify(catMeta)); } catch(e) {}
+    }
+    saveLocal();
+    render();
+    toast('Dados sincronizados!');
+    setFbStatus('ok');
+  } catch(e) {
+    console.error('[syncFromFirebase] erro:', e);
+    setFbStatus('err');
+    toast('Erro ao sincronizar com Firebase', 'err');
+  }
+}
+
+window.manualSync = async function() {
+  if(!fbDb) { toast('Firebase não conectado', 'err'); return; }
+  toast('Sincronizando...');
+  await syncFromFirebase();
+};
+
+// ---- CATEGORIES FOR MONTH ----
+function getCategoriesForMonth(k) {
+  const customs = Object.keys(customCats).filter(cat => {
+    const f = customCats[cat];
+    return k >= f.startKey && k <= f.endKey;
+  });
+  return [...DEFAULT_CATEGORIES, ...customs];
+}
+
+function getColorForCat(cat, allCats) {
+  const idx = allCats.indexOf(cat);
+  return COLORS[idx % COLORS.length];
+}
+
+// ---- MONTH OBJ ----
+// Garante que gastos e parcelas nunca sejam undefined ao acessar
+function getMonthObj(k) {
+  if(!monthData[k]) monthData[k] = { gastos: {}, parcelas: [] };
+  if(!monthData[k].gastos) monthData[k].gastos = {};
+  if(!monthData[k].parcelas) monthData[k].parcelas = [];
+  return monthData[k];
+}
+
+function setGasto(cat, val) {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  if(!val || isNaN(val) || val === 0) delete obj.gastos[cat];
+  else obj.gastos[cat] = parseFloat(val);
+  saveLocal();
+  syncToFirebase(k);
+  updateSummary();
+  updateBars();
+}
+
+// Marca/desmarca uma categoria como paga no mês atual
+window.togglePago = function(cat) {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  if(!obj.pago) obj.pago = {};
+  obj.pago[cat] = !obj.pago[cat];
+  if(!obj.pago[cat]) delete obj.pago[cat];
+  saveLocal();
+  syncToFirebase(k);
+  render();
+};
+
+// Fixa/desfixa o valor atual de uma categoria para se repetir todo mês
+window.togglePin = function(cat) {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  const val = obj.gastos[cat] || 0;
+
+  if(catMeta[cat]?.pinned) {
+    // desafixar
+    delete catMeta[cat];
+    saveCatMeta();
+    toast(`Valor fixo de "${cat}" removido`, 'warn');
+  } else {
+    if(!val || val === 0) {
+      toast('Digite um valor antes de fixar', 'err');
+      return;
+    }
+    if(!catMeta[cat]) catMeta[cat] = {};
+    catMeta[cat].pinned = true;
+    catMeta[cat].pinnedValue = val;
+    saveCatMeta();
+    toast(`✅ "${cat}" fixada em ${fmtBRL(val)} todo mês`);
+  }
+  render();
+};
+
+// Ao mudar de mês, preenche automaticamente categorias com valor fixado
+// caso o mês ainda não tenha valor para elas
+function autoFillPinned() {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  let changed = false;
+  Object.keys(catMeta).forEach(cat => {
+    if(catMeta[cat]?.pinned && catMeta[cat].pinnedValue > 0) {
+      if(!obj.gastos[cat]) {
+        obj.gastos[cat] = catMeta[cat].pinnedValue;
+        changed = true;
+      }
+    }
+  });
+  if(changed) { saveLocal(); syncToFirebase(k); }
+}
+
+function getTotalGastos(k) {
+  return Object.values(getMonthObj(k).gastos).reduce((a,b)=>a+b,0);
+}
+
+function getParcelasThisMonth(k) {
+  return (getMonthObj(k).parcelas||[]).filter(p=>p.ativo).reduce((a,p)=>a+(p.total/p.qtd),0);
+}
+
+// ---- NAVIGATION ----
+window.changeMonth = function(dir) {
+  currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+dir, 1);
+  // limpa busca ao trocar de mês
+  searchQuery = '';
+  const si = document.getElementById('searchInput');
+  if(si) si.value = '';
+  autoFillPinned();
+  render();
+};
+
+window.showPage = function(page) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  $(`page-${page}`).classList.add('active');
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  if(page==='historico') renderHistory();
+  if(page==='parcelas') renderInstallments();
+  if(page==='config') {
+    const customs = Object.keys(customCats).length;
+    $('cfgCatCustom').textContent = `${customs} categori${customs!==1?'as':'a'}`;
+  }
+};
+
+// ---- ADD CATEGORY MODAL ----
+window.openAddCatModal = function() {
+  repeatMode = 'single';
+  $('newCatName').value = '';
+  $('newCatMonths').value = '5';
+  $('repeatOptions').style.display = 'none';
+  $('fixedOptions').style.display = 'none';
+  $('optSingle').classList.add('selected');
+  $('optRepeat').classList.remove('selected');
+  $('optFixed').classList.remove('selected');
+  $('optSingleLabel').textContent = fmtMonthShort(currentDate);
+  updateMonthsPreview();
+  $('addCatModal').classList.add('open');
+  setTimeout(() => $('newCatName').focus(), 100);
+};
+
+window.closeAddCatModal = function() { $('addCatModal').classList.remove('open'); };
+
+window.selectRepeat = function(mode) {
+  repeatMode = mode;
+  $('optSingle').classList.toggle('selected', mode==='single');
+  $('optRepeat').classList.toggle('selected', mode==='repeat');
+  $('optFixed').classList.toggle('selected', mode==='fixed');
+  $('repeatOptions').style.display = mode==='repeat' ? 'block' : 'none';
+  $('fixedOptions').style.display = mode==='fixed' ? 'block' : 'none';
+  updateMonthsPreview();
+};
+
+window.updateMonthsPreview = function() {
+  if(repeatMode === 'repeat') {
+    const chips = $('monthsChips');
+    chips.innerHTML = '';
+    const n = Math.max(2, Math.min(24, parseInt($('newCatMonths').value)||5));
+    for(let i=0;i<n;i++) {
+      const d = new Date(currentDate.getFullYear(), currentDate.getMonth()+i, 1);
+      const chip = document.createElement('div');
+      chip.className = 'month-chip';
+      chip.textContent = fmtMonthShort(d);
+      chips.appendChild(chip);
+    }
+  }
+  if(repeatMode === 'fixed') {
+    const chips = $('fixedChips');
+    chips.innerHTML = '';
+    for(let i=0;i<6;i++) {
+      const d = new Date(currentDate.getFullYear(), currentDate.getMonth()+i, 1);
+      const chip = document.createElement('div');
+      chip.className = 'month-chip';
+      chip.textContent = fmtMonthShort(d);
+      chips.appendChild(chip);
+    }
+    const more = document.createElement('div');
+    more.className = 'month-chip';
+    more.textContent = '…';
+    chips.appendChild(more);
+  }
+};
+
+window.confirmAddCat = function() {
+  const name = $('newCatName').value.trim().toUpperCase();
+  if(!name) { toast('Digite o nome da categoria', 'err'); return; }
+  if(DEFAULT_CATEGORIES.includes(name)) { toast('Essa categoria já existe!', 'err'); return; }
+
+  const k = monthKey(currentDate);
+  let endKey = k; // padrão: só este mês
+
+  if(repeatMode === 'fixed') {
+    endKey = FIXED_END_KEY;
+  } else if(repeatMode === 'repeat') {
+    const n = Math.max(2, Math.min(24, parseInt($('newCatMonths').value)||5));
+    const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+n-1, 1);
+    endKey = monthKey(endDate);
+  }
+
+  if(customCats[name]) {
+    if(endKey > customCats[name].endKey) customCats[name].endKey = endKey;
+    toast(`Categoria "${name}" já existe, período atualizado!`, 'warn');
+  } else {
+    customCats[name] = { startKey: k, endKey };
+  }
+
+  saveCustomCats();
+  closeAddCatModal();
+  render();
+  toast(`✅ Categoria "${name}" adicionada!`);
+};
+
+window.removeCustomCat = function(cat) {
+  if(!confirm(`Remover a categoria "${cat}"? Os valores lançados serão mantidos.`)) return;
+  delete customCats[cat];
+  saveCustomCats();
+  render();
+  toast(`Categoria "${cat}" removida!`, 'warn');
+};
+
+// Salva o dia de vencimento de uma categoria (persiste em catMeta, independe do mês)
+window.setVencimento = function(cat, val) {
+  const day = parseInt(val);
+  if(!catMeta[cat]) catMeta[cat] = {};
+  if(!val || isNaN(day) || day < 1 || day > 31) {
+    delete catMeta[cat].vencimento;
+  } else {
+    catMeta[cat].vencimento = day;
+  }
+  // limpa objeto vazio
+  if(catMeta[cat] && Object.keys(catMeta[cat]).length === 0) delete catMeta[cat];
+  saveCatMeta();
+};
+// ---- BUSCA E ORDENAÇÃO ----
+window.applyFilters = function() {
+  searchQuery = ($('searchInput')?.value || '').trim().toLowerCase();
+  render();
+};
+
+window.toggleSortVenc = function() {
+  sortVenc = !sortVenc;
+  const btn = $('sortVencBtn');
+  if(btn) btn.classList.toggle('active', sortVenc);
+  render();
+};
+
+function getFilteredSortedCats(allCats) {
+  let cats = allCats;
+  // filtro de busca
+  if(searchQuery) {
+    cats = cats.filter(c => c.toLowerCase().includes(searchQuery));
+  }
+  // ordenação por vencimento
+  if(sortVenc) {
+    cats = [...cats].sort((a, b) => {
+      const va = catMeta[a]?.vencimento || 99;
+      const vb = catMeta[b]?.vencimento || 99;
+      return va - vb;
+    });
+  }
+  return cats;
+}
+
+function render() {
+  const k = monthKey(currentDate);
+  $('monthLabel').textContent = fmtMonth(currentDate);
+  $('actionMonth').textContent = fmtMonthLong(currentDate);
+  const obj = getMonthObj(k);
+  if(!obj.pago) obj.pago = {};
+  const allCats = getCategoriesForMonth(k);
+  const total = getTotalGastos(k);
+  const tbody = $('tableBody');
+  const cardsEl = $('catCards');
+  tbody.innerHTML = '';
+  cardsEl.innerHTML = '';
+
+  const visibleCats = getFilteredSortedCats(allCats);
+  if(visibleCats.length === 0 && searchQuery) {
+    tbody.innerHTML = `<tr><td colspan="5" class="no-results" style="padding:2rem;text-align:center;color:var(--muted)">Nenhuma categoria encontrada para "<strong>${searchQuery}</strong>"</td></tr>`;
+    cardsEl.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted);font-size:14px">Nenhuma categoria encontrada para "<strong>${searchQuery}</strong>"</div>`;
+    updateSummary(); return;
+  }
+  visibleCats.forEach(cat => {
+    const val = obj.gastos[cat] || 0;
+    const pct = total > 0 ? Math.round((val/total)*100) : 0;
+    const color = getColorForCat(cat, allCats);
+    const isCustom = !!customCats[cat];
+    const f = customCats[cat];
+    const isFixed = isCustom && f.endKey === FIXED_END_KEY;
+    const isRepeat = isCustom && !isFixed && f.startKey !== f.endKey;
+    const isPago = !!(obj.pago && obj.pago[cat]);
+    const isPinned = !!(catMeta[cat]?.pinned);
+    const venc = catMeta[cat]?.vencimento || '';
+    const catEsc = cat.replace(/'/g,"\\'");
+
+    const badges = [
+      isFixed ? '<span class="fixed-tag">📌 fixa</span>' : '',
+      isRepeat ? '<span class="fixed-tag" style="background:rgba(91,156,246,0.12);color:#5b9cf6;border-color:rgba(91,156,246,0.25)">🔁 repetindo</span>' : '',
+      isCustom && !isFixed && !isRepeat ? '<span class="custom-tag">só este mês</span>' : ''
+    ].filter(Boolean).join(' ');
+
+    const mkBtnPago = () => `<button class="action-btn${isPago?' pago':''}" title="${isPago?'Desmarcar pago':'Marcar como pago'}" onclick="window.togglePago('${catEsc}')">${isPago?'✓':'○'}</button>`;
+    const mkBtnPin  = () => `<button class="action-btn${isPinned?' pinned':''}" title="${isPinned?'Desafixar valor':'Fixar valor todo mês'}" onclick="window.togglePin('${catEsc}')">${isPinned?'📌':'⊙'}</button>`;
+    const mkBtnDel  = () => isCustom ? `<button class="action-btn" title="Remover categoria" style="color:#666" onclick="window.removeCustomCat('${catEsc}')">×</button>` : '';
+
+    const zeroSpan = `<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:14px;color:#444;pointer-events:none">R$ 0,00</span>`;
+
+    // ── TABELA (desktop) ──
+    const catDisplayTable = badges
+      ? `<div style="display:flex;flex-direction:column;gap:2px"><span>${cat}<span class="row-paid-badge">✓ pago</span></span><div style="display:flex;gap:4px">${badges}</div></div>`
+      : `<span>${cat}<span class="row-paid-badge">✓ pago</span></span>`;
+
+    const tr = document.createElement('tr');
+    if(isPago) tr.className = 'row-pago';
+    tr.innerHTML = `
+      <td><div class="cat-name"><div class="cat-pill" style="background:${color}"></div>${catDisplayTable}</div></td>
+      <td class="right">
+        <div style="display:inline-flex;align-items:center;gap:4px;justify-content:flex-end">
+          <div style="position:relative;display:inline-block">
+            <input class="value-input" type="number" step="0.01" min="0"
+              value="${val>0?val:''}" data-cat="${cat}"
+              ${isPinned?`title="Fixado em ${fmtBRL(catMeta[cat].pinnedValue)}/mês"`:''}
+              onchange="window.onGastoChange(this)" onblur="window.onGastoChange(this)" />
+            ${val<=0?zeroSpan:''}
+          </div>
+          ${isPinned?`<span class="row-pinned-badge">📌</span>`:''}
+        </div>
+      </td>
+      <td style="text-align:center;padding:6px 8px">
+        <div style="display:inline-flex;align-items:center;gap:5px">
+          <input class="venc-input" type="number" min="1" max="31"
+            value="${venc}" placeholder="dia" data-cat="${cat}"
+            onchange="window.setVencimento('${catEsc}',this.value)"
+            onblur="window.setVencimento('${catEsc}',this.value)" />
+          ${venc?`<span class="venc-suffix">todo mês</span>`:''}
+        </div>
+      </td>
+      <td class="bar-col">
+        <div class="bar-wrap">
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <span class="bar-pct">${pct}%</span>
+        </div>
+      </td>
+      <td style="padding:6px 10px 6px 4px;white-space:nowrap">
+        <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+          ${mkBtnPago()}${mkBtnPin()}${mkBtnDel()}
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+
+    // ── CARD (mobile) ──
+    const card = document.createElement('div');
+    card.className = `cat-card${isPago?' card-pago':''}`;
+    card.innerHTML = `
+      <div class="cat-card-header">
+        <div class="cat-pill" style="background:${color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></div>
+        <span class="cat-card-name">${cat}</span>
+        ${isPago?`<span class="row-paid-badge" style="display:inline-flex">✓ pago</span>`:''}
+        ${isPinned?`<span class="row-pinned-badge">📌</span>`:''}
+      </div>
+      ${badges?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding-left:16px">${badges}</div>`:''}
+      <div class="cat-card-body">
+        <div style="position:relative;flex:1;min-width:0">
+          <input class="cat-card-input" type="number" step="0.01" min="0"
+            value="${val>0?val:''}" data-cat="${cat}"
+            ${isPinned?`title="Fixado em ${fmtBRL(catMeta[cat].pinnedValue)}/mês"`:''}
+            onchange="window.onGastoChange(this)" onblur="window.onGastoChange(this)" />
+          ${val<=0?`<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:14px;color:#444;pointer-events:none">R$ 0,00</span>`:''}
+        </div>
+        <div class="cat-card-venc" title="Dia do vencimento">
+          <span>dia</span>
+          <input type="number" min="1" max="31" value="${venc}" placeholder="—"
+            data-cat="${cat}"
+            onchange="window.setVencimento('${catEsc}',this.value)"
+            onblur="window.setVencimento('${catEsc}',this.value)" />
+        </div>
+        <div class="cat-card-actions">
+          ${mkBtnPago()}${mkBtnPin()}${mkBtnDel()}
+        </div>
+      </div>
+    `;
+    cardsEl.appendChild(card);
+  });
+
+  updateSummary();
+}
+
+window.onGastoChange = function(input) {
+  setGasto(input.dataset.cat, parseFloat(input.value)||0);
+};
+
+function updateSummary() {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  const allCats = getCategoriesForMonth(k);
+  const total = getTotalGastos(k);
+  const parcTotal = getParcelasThisMonth(k);
+  const filled = Object.values(obj.gastos).filter(v=>v>0).length;
+  const orc = settings.orcamento || 0;
+  const saldo = orc - total;
+
+  $('sumTotal').textContent = fmtBRL(total);
+  const pagos = Object.keys(obj.pago||{}).filter(c=>obj.pago[c]).length;
+  $('sumCats').textContent = `${filled} preenchidas${pagos>0?' · '+pagos+' pagas':''} / ${allCats.length}`;
+  $('sumOrc').textContent = orc>0 ? fmtBRL(orc) : 'R$ —';
+  $('sumOrcSub').textContent = orc>0 ? (total/orc*100).toFixed(0)+'% usado' : 'defina em Config';
+  $('footTotal').textContent = fmtBRL(total);
+  $('sumParcelas').textContent = fmtBRL(parcTotal);
+  $('sumParcelasSub').textContent = `${(obj.parcelas||[]).filter(p=>p.ativo).length} ativos`;
+
+  if(orc > 0) {
+    $('sumSaldo').textContent = fmtBRL(Math.abs(saldo));
+    $('sumSaldo').className = `s-value ${saldo>=0?'green':'red'}`;
+    $('sumSaldoSub').textContent = saldo>=0 ? 'disponível' : 'acima do limite';
+  } else {
+    $('sumSaldo').textContent = '—';
+    $('sumSaldo').className = 's-value';
+    $('sumSaldoSub').textContent = ' ';
+  }
+}
+
+function updateBars() {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  const allCats = getCategoriesForMonth(k);
+  const total = getTotalGastos(k);
+  document.querySelectorAll('.bar-fill').forEach((el,i) => {
+    const cat = allCats[i]; if(!cat) return;
+    const pct = total>0 ? Math.round(((obj.gastos[cat]||0)/total)*100) : 0;
+    el.style.width = pct+'%';
+  });
+  document.querySelectorAll('.bar-pct').forEach((el,i) => {
+    const cat = allCats[i]; if(!cat) return;
+    const pct = total>0 ? Math.round(((obj.gastos[cat]||0)/total)*100) : 0;
+    el.textContent = pct+'%';
+  });
+}
+
+window.clearAll = function() {
+  if(!confirm('Limpar todos os valores deste mês?')) return;
+  const k = monthKey(currentDate);
+  getMonthObj(k).gastos = {};
+  saveLocal();
+  syncToFirebase(k);
+  render();
+  toast('Valores limpos!');
+};
+
+// ---- PARCELAS ----
+window.openInstModal = function(id) {
+  editingInstId = id || null;
+  const k = monthKey(currentDate);
+  const allCats = getCategoriesForMonth(k);
+  const sel = $('instCat');
+  sel.innerHTML = '<option value="">— Nenhuma —</option>';
+  allCats.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  if(id) {
+    const p = getMonthObj(k).parcelas.find(x=>x.id===id);
+    if(p) {
+      $('modalTitle').textContent='Editar Parcelamento';
+      $('instName').value=p.nome;
+      $('instTotal').value=p.total;
+      $('instQtd').value=p.qtd;
+      $('instAtual').value=p.atual;
+      $('instCat').value=p.cat||'';
+    }
+  } else {
+    $('modalTitle').textContent='Novo Parcelamento';
+    $('instName').value=''; $('instTotal').value=''; $('instQtd').value=''; $('instAtual').value='1'; $('instCat').value='';
+  }
+  $('instModal').classList.add('open');
+};
+
+window.closeModal = function() { $('instModal').classList.remove('open'); editingInstId=null; };
+
+window.saveInstallment = function() {
+  const nome = $('instName').value.trim();
+  const total = parseFloat($('instTotal').value);
+  const qtd = parseInt($('instQtd').value);
+  const atual = parseInt($('instAtual').value);
+  const cat = $('instCat').value;
+  if(!nome||!total||!qtd||!atual) { toast('Preencha todos os campos','err'); return; }
+  if(atual>qtd) { toast('Parcela atual maior que o total','err'); return; }
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  const parc = { id: editingInstId||Date.now().toString(), nome, total, qtd, atual, cat, ativo: true };
+  if(editingInstId) {
+    const idx = obj.parcelas.findIndex(x=>x.id===editingInstId);
+    if(idx!==-1) obj.parcelas[idx] = parc;
+  } else {
+    obj.parcelas.push(parc);
+  }
+  if(cat) obj.gastos[cat] = (obj.gastos[cat]||0) + (total/qtd);
+  saveLocal();
+  syncToFirebase(k);
+  closeModal();
+  renderInstallments();
+  updateSummary();
+  toast('Parcelamento salvo!');
+};
+
+window.deleteInst = function(id) {
+  if(!confirm('Remover parcelamento?')) return;
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  obj.parcelas = obj.parcelas.filter(x=>x.id!==id);
+  saveLocal();
+  syncToFirebase(k);
+  renderInstallments();
+  updateSummary();
+  toast('Removido!');
+};
+
+function renderInstallments() {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  const list = $('instList');
+  const parcelas = obj.parcelas || [];
+  if(!parcelas.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">🔄</div><p>Nenhum parcelamento cadastrado ainda.<br>Clique em "Adicionar" para começar.</p></div>`;
+    return;
+  }
+  list.innerHTML = '';
+  parcelas.forEach(p => {
+    const mensal = p.total/p.qtd;
+    const pct = Math.round((p.atual/p.qtd)*100);
+    const div = document.createElement('div');
+    div.className = 'inst-card';
+    div.innerHTML = `
+      <div class="inst-info"><div class="inst-name">${p.nome}</div><div class="inst-meta">${p.atual}ª de ${p.qtd} · ${fmtBRL(mensal)}/mês · ${p.qtd-p.atual} restantes${p.cat?' · '+p.cat:''}</div></div>
+      <div class="inst-progress"><div class="prog-label"><span>${pct}%</span><span>${fmtBRL(p.total)}</span></div><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#c8f55a"></div></div></div>
+      <div class="inst-value">${fmtBRL(mensal)}</div>
+      <div class="inst-actions"><button class="btn" onclick="window.openInstModal('${p.id}')">✏️</button><button class="btn danger-btn" onclick="window.deleteInst('${p.id}')">🗑</button></div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+// ---- HISTÓRICO ----
+function renderHistory() {
+  const grid = $('histGrid');
+  const keys = Object.keys(monthData).sort().reverse();
+  const curKey = monthKey(currentDate);
+  if(!keys.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">📅</div><p>Nenhum dado registrado ainda.</p></div>`;
+    return;
+  }
+  grid.innerHTML = '';
+  keys.forEach(k => {
+    const [yr,mo] = k.split('-').map(Number);
+    const d = new Date(yr, mo-1, 1);
+    const total = getTotalGastos(k);
+    const filled = Object.values(getMonthObj(k).gastos).filter(v=>v>0).length;
+    const div = document.createElement('div');
+    div.className = `hist-card ${k===curKey?'current':''}`;
+    div.innerHTML = `<div class="hist-month">${fmtMonthLong(d)}</div><div class="hist-total">${fmtBRL(total)}</div><div class="hist-count">${filled} categorias preenchidas</div>`;
+    div.onclick = () => { currentDate=d; showPage('gastos'); render(); };
+    grid.appendChild(div);
+  });
+}
+
+// ---- CONFIG ----
+window.saveOrcamento = function() {
+  settings.orcamento = parseFloat($('cfgOrcamento').value) || 0;
+  saveSettings();
+  updateSummary();
+  toast('Orçamento salvo!');
+};
+
+window.exportCSV = function() {
+  const k = monthKey(currentDate);
+  const obj = getMonthObj(k);
+  const allCats = getCategoriesForMonth(k);
+  const rows = [['Categoria','Valor']];
+  allCats.forEach(c => rows.push([c, (obj.gastos[c]||0).toFixed(2).replace('.',',')]));
+  rows.push(['TOTAL', getTotalGastos(k).toFixed(2).replace('.',',')]);
+  const csv = rows.map(r=>r.join(';')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `financas_${k}.csv`;
+  a.click();
+  toast('CSV exportado!');
+};
+
+window.clearLocalData = function() {
+  if(!confirm('Apagar TODOS os dados locais?')) return;
+  localStorage.removeItem('fin_data');
+  localStorage.removeItem('fin_custom_cats');
+  localStorage.removeItem('fin_cat_meta');
+  monthData = {};
+  customCats = {};
+  catMeta = {};
+  render();
+  toast('Dados apagados!');
+};
+
+
+// ---- EXPOR FUNÇÕES GLOBAIS (necessário com type=module) ----
+async function init() {
+  loadLocal();
+  autoFillPinned();
+  render();
+  await connectFirebase();
+}
+
+init();
+</script>
+</body>
+</html>
