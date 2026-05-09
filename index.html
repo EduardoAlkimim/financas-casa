@@ -194,6 +194,31 @@
     .empty .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.4; }
     .empty p { font-size: 14px; }
 
+    /* VENCIMENTO input inline */
+    .venc-input { font-family: 'DM Mono', monospace; font-size: 12px; background: transparent; border: 1px solid transparent; color: var(--muted); width: 52px; text-align: center; padding: 3px 4px; border-radius: 6px; transition: all 0.15s; }
+    .venc-input:hover { border-color: var(--border2); color: var(--text); }
+    .venc-input:focus { outline: none; border-color: var(--accent); background: var(--surface2); color: var(--text); }
+    .venc-input::placeholder { color: #3a3a3a; }
+    .venc-wrap { display: flex; align-items: center; gap: 3px; }
+    .venc-label { font-size: 11px; color: #3a3a3a; }
+    .venc-wrap:has(.venc-input:not([value=''])) .venc-label,
+    .venc-wrap.has-value .venc-label { color: var(--muted); }
+
+    /* CARDS MOBILE — usados em telas pequenas no lugar da tabela */
+    .cat-cards { display: none; flex-direction: column; gap: 8px; }
+    .cat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 10px 14px; transition: border-color 0.15s; }
+    .cat-card.card-pago { border-color: rgba(76,175,125,0.3); background: rgba(76,175,125,0.04); }
+    .cat-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .cat-card-name { font-size: 14px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cat-card-body { display: flex; align-items: center; gap: 8px; }
+    .cat-card-input { font-family: 'DM Mono', monospace; font-size: 14px; background: var(--surface2); border: 1px solid var(--border2); color: var(--text); flex: 1; min-width: 0; text-align: right; padding: 6px 10px; border-radius: 8px; transition: all 0.15s; }
+    .cat-card-input:focus { outline: none; border-color: var(--accent); }
+    .cat-card-venc { display: flex; align-items: center; gap: 4px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 6px 8px; }
+    .cat-card-venc span { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .cat-card-venc input { font-family: 'DM Mono', monospace; font-size: 13px; background: transparent; border: none; color: var(--text); width: 30px; text-align: center; padding: 0; }
+    .cat-card-venc input:focus { outline: none; color: var(--accent); }
+    .cat-card-actions { display: flex; gap: 4px; }
+
     @media (max-width: 768px) {
       .app { flex-direction: column; }
       .sidebar { width: 100%; height: auto; position: static; flex-direction: row; flex-wrap: wrap; padding: 0.75rem 1rem; gap: 8px; }
@@ -205,10 +230,11 @@
       .tab-btn { padding: 6px 10px; font-size: 13px; }
       .tab-btn .icon { display: none; }
       .fb-indicator { display: none; }
-      .main { padding: 1rem; }
+      .main { padding: 0.75rem; }
       .summary-grid { grid-template-columns: repeat(2, 1fr); }
-      td.bar-col { display: none; }
-      th.bar-col { display: none; }
+      /* esconde tabela, mostra cards */
+      .table-wrap { display: none; }
+      .cat-cards { display: flex; }
       .inst-progress { display: none; }
       .toggle-options { flex-wrap: wrap; }
     }
@@ -285,6 +311,7 @@
             <tr>
               <th>Categoria</th>
               <th class="right">Valor</th>
+              <th style="text-align:center;width:90px">Vencimento</th>
               <th class="bar-col">Proporção</th>
               <th class="right" style="width:100px;padding-right:14px">Ações</th>
             </tr>
@@ -294,12 +321,16 @@
             <tr>
               <td>Total</td>
               <td class="right mono" id="footTotal">R$ 0,00</td>
+              <td></td>
               <td class="bar-col"></td>
               <td></td>
             </tr>
           </tfoot>
         </table>
       </div>
+
+      <!-- Cards para mobile -->
+      <div class="cat-cards" id="catCards"></div>
     </div>
 
     <!-- PARCELAS -->
@@ -808,7 +839,19 @@ window.removeCustomCat = function(cat) {
   toast(`Categoria "${cat}" removida!`, 'warn');
 };
 
-// ---- RENDER TABLE ----
+// Salva o dia de vencimento de uma categoria (persiste em catMeta, independe do mês)
+window.setVencimento = function(cat, val) {
+  const day = parseInt(val);
+  if(!catMeta[cat]) catMeta[cat] = {};
+  if(!val || isNaN(day) || day < 1 || day > 31) {
+    delete catMeta[cat].vencimento;
+  } else {
+    catMeta[cat].vencimento = day;
+  }
+  // limpa objeto vazio
+  if(catMeta[cat] && Object.keys(catMeta[cat]).length === 0) delete catMeta[cat];
+  saveCatMeta();
+};
 function render() {
   const k = monthKey(currentDate);
   $('monthLabel').textContent = fmtMonth(currentDate);
@@ -818,7 +861,9 @@ function render() {
   const allCats = getCategoriesForMonth(k);
   const total = getTotalGastos(k);
   const tbody = $('tableBody');
+  const cardsEl = $('catCards');
   tbody.innerHTML = '';
+  cardsEl.innerHTML = '';
 
   allCats.forEach(cat => {
     const val = obj.gastos[cat] || 0;
@@ -830,6 +875,8 @@ function render() {
     const isRepeat = isCustom && !isFixed && f.startKey !== f.endKey;
     const isPago = !!(obj.pago && obj.pago[cat]);
     const isPinned = !!(catMeta[cat]?.pinned);
+    const venc = catMeta[cat]?.vencimento || '';
+    const catEsc = cat.replace(/'/g,"\\'");
 
     const badges = [
       isFixed ? '<span class="fixed-tag">📌 fixa</span>' : '',
@@ -837,48 +884,40 @@ function render() {
       isCustom && !isFixed && !isRepeat ? '<span class="custom-tag">só este mês</span>' : ''
     ].filter(Boolean).join(' ');
 
-    const catDisplay = badges
-      ? `<div style="display:flex;flex-direction:column;gap:3px"><span>${cat}<span class="row-paid-badge">✓ pago</span></span><div style="display:flex;gap:4px;margin-top:1px">${badges}</div></div>`
+    const mkBtnPago = () => `<button class="action-btn${isPago?' pago':''}" title="${isPago?'Desmarcar pago':'Marcar como pago'}" onclick="window.togglePago('${catEsc}')">${isPago?'✓':'○'}</button>`;
+    const mkBtnPin  = () => `<button class="action-btn${isPinned?' pinned':''}" title="${isPinned?'Desafixar valor':'Fixar valor todo mês'}" onclick="window.togglePin('${catEsc}')">${isPinned?'📌':'⊙'}</button>`;
+    const mkBtnDel  = () => isCustom ? `<button class="action-btn" title="Remover categoria" style="color:#666" onclick="window.removeCustomCat('${catEsc}')">×</button>` : '';
+
+    const zeroSpan = `<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:14px;color:#444;pointer-events:none">R$ 0,00</span>`;
+
+    // ── TABELA (desktop) ──
+    const catDisplayTable = badges
+      ? `<div style="display:flex;flex-direction:column;gap:2px"><span>${cat}<span class="row-paid-badge">✓ pago</span></span><div style="display:flex;gap:4px">${badges}</div></div>`
       : `<span>${cat}<span class="row-paid-badge">✓ pago</span></span>`;
-
-    const catEsc = cat.replace(/'/g,"\\'");
-
-    // botão pago
-    const btnPago = `<button
-      class="action-btn${isPago?' pago':''}"
-      title="${isPago?'Marcar como não pago':'Marcar como pago'}"
-      onclick="window.togglePago('${catEsc}')"
-    >${isPago?'✓':'○'}</button>`;
-
-    // botão fixar valor
-    const btnPin = `<button
-      class="action-btn${isPinned?' pinned':''}"
-      title="${isPinned?`Desafixar valor (${fmtBRL(catMeta[cat].pinnedValue)}/mês)`:'Fixar valor para todo mês'}"
-      onclick="window.togglePin('${catEsc}')"
-    >${isPinned?'📌':'⊙'}</button>`;
-
-    // botão remover (só custom)
-    const btnDel = isCustom
-      ? `<button class="action-btn" title="Remover categoria" style="color:#555" onclick="window.removeCustomCat('${catEsc}')">×</button>`
-      : '';
 
     const tr = document.createElement('tr');
     if(isPago) tr.className = 'row-pago';
-
     tr.innerHTML = `
-      <td><div class="cat-name"><div class="cat-pill" style="background:${color}"></div>${catDisplay}</div></td>
-      <td class="right" style="position:relative">
+      <td><div class="cat-name"><div class="cat-pill" style="background:${color}"></div>${catDisplayTable}</div></td>
+      <td class="right">
         <div style="display:inline-flex;align-items:center;gap:4px;justify-content:flex-end">
           <div style="position:relative;display:inline-block">
             <input class="value-input" type="number" step="0.01" min="0"
-              value="${val>0?val:''}"
-              data-cat="${cat}"
-              ${isPinned?`title="Valor fixado em ${fmtBRL(catMeta[cat].pinnedValue)} — edite para alterar"`:'' }
-              onchange="window.onGastoChange(this)"
-              onblur="window.onGastoChange(this)" />
-            ${val<=0?`<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:14px;color:#444;pointer-events:none">R$ 0,00</span>`:''}
+              value="${val>0?val:''}" data-cat="${cat}"
+              ${isPinned?`title="Fixado em ${fmtBRL(catMeta[cat].pinnedValue)}/mês"`:''}
+              onchange="window.onGastoChange(this)" onblur="window.onGastoChange(this)" />
+            ${val<=0?zeroSpan:''}
           </div>
-          ${isPinned?`<span class="row-pinned-badge" title="Valor fixado todo mês">📌</span>`:''}
+          ${isPinned?`<span class="row-pinned-badge">📌</span>`:''}
+        </div>
+      </td>
+      <td style="text-align:center;padding:6px 8px">
+        <div style="display:inline-flex;align-items:center;gap:3px">
+          <input class="venc-input" type="number" min="1" max="31"
+            value="${venc}" placeholder="—" data-cat="${cat}"
+            onchange="window.setVencimento('${catEsc}',this.value)"
+            onblur="window.setVencimento('${catEsc}',this.value)" />
+          <span style="font-size:11px;color:${venc?'var(--muted)':'#3a3a3a'}">${venc?'todo mês':'—'}</span>
         </div>
       </td>
       <td class="bar-col">
@@ -889,11 +928,44 @@ function render() {
       </td>
       <td style="padding:6px 10px 6px 4px;white-space:nowrap">
         <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
-          ${btnPago}${btnPin}${btnDel}
+          ${mkBtnPago()}${mkBtnPin()}${mkBtnDel()}
         </div>
       </td>
     `;
     tbody.appendChild(tr);
+
+    // ── CARD (mobile) ──
+    const card = document.createElement('div');
+    card.className = `cat-card${isPago?' card-pago':''}`;
+    card.innerHTML = `
+      <div class="cat-card-header">
+        <div class="cat-pill" style="background:${color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></div>
+        <span class="cat-card-name">${cat}</span>
+        ${isPago?`<span class="row-paid-badge" style="display:inline-flex">✓ pago</span>`:''}
+        ${isPinned?`<span class="row-pinned-badge">📌</span>`:''}
+      </div>
+      ${badges?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding-left:16px">${badges}</div>`:''}
+      <div class="cat-card-body">
+        <div style="position:relative;flex:1;min-width:0">
+          <input class="cat-card-input" type="number" step="0.01" min="0"
+            value="${val>0?val:''}" data-cat="${cat}"
+            ${isPinned?`title="Fixado em ${fmtBRL(catMeta[cat].pinnedValue)}/mês"`:''}
+            onchange="window.onGastoChange(this)" onblur="window.onGastoChange(this)" />
+          ${val<=0?`<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-family:'DM Mono',monospace;font-size:14px;color:#444;pointer-events:none">R$ 0,00</span>`:''}
+        </div>
+        <div class="cat-card-venc" title="Dia do vencimento">
+          <span>dia</span>
+          <input type="number" min="1" max="31" value="${venc}" placeholder="—"
+            data-cat="${cat}"
+            onchange="window.setVencimento('${catEsc}',this.value)"
+            onblur="window.setVencimento('${catEsc}',this.value)" />
+        </div>
+        <div class="cat-card-actions">
+          ${mkBtnPago()}${mkBtnPin()}${mkBtnDel()}
+        </div>
+      </div>
+    `;
+    cardsEl.appendChild(card);
   });
 
   updateSummary();
