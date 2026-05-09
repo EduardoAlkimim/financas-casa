@@ -194,15 +194,23 @@
     .empty .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.4; }
     .empty p { font-size: 14px; }
 
-    /* VENCIMENTO input inline */
-    .venc-input { font-family: 'DM Mono', monospace; font-size: 12px; background: transparent; border: 1px solid transparent; color: var(--muted); width: 52px; text-align: center; padding: 3px 4px; border-radius: 6px; transition: all 0.15s; }
-    .venc-input:hover { border-color: var(--border2); color: var(--text); }
-    .venc-input:focus { outline: none; border-color: var(--accent); background: var(--surface2); color: var(--text); }
-    .venc-input::placeholder { color: #3a3a3a; }
-    .venc-wrap { display: flex; align-items: center; gap: 3px; }
-    .venc-label { font-size: 11px; color: #3a3a3a; }
-    .venc-wrap:has(.venc-input:not([value=''])) .venc-label,
-    .venc-wrap.has-value .venc-label { color: var(--muted); }
+    /* VENCIMENTO */
+    .venc-input { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; background: var(--surface2); border: 1px solid var(--border2); color: var(--text); width: 44px; text-align: center; padding: 3px 6px; border-radius: 6px; transition: all 0.15s; }
+    .venc-input:hover { border-color: rgba(255,255,255,0.25); }
+    .venc-input:focus { outline: none; border-color: var(--accent); background: #2a2a2a; }
+    .venc-input::placeholder { color: #555; font-weight: 400; font-size: 11px; }
+    .venc-suffix { font-size: 10px; color: var(--muted); }
+
+    /* BUSCA E ORDENAÇÃO */
+    .table-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .search-wrap { position: relative; flex: 1; min-width: 160px; }
+    .search-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 7px 12px 7px 32px; transition: border-color 0.15s; }
+    .search-wrap input:focus { outline: none; border-color: var(--accent); }
+    .search-wrap input::placeholder { color: #555; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #555; font-size: 13px; pointer-events: none; }
+    .sort-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--surface); color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .sort-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); font-weight: 600; }
 
     /* CARDS MOBILE — usados em telas pequenas no lugar da tabela */
     .cat-cards { display: none; flex-direction: column; gap: 8px; }
@@ -303,6 +311,16 @@
           <button class="btn primary" onclick="openAddCatModal()">+ Categoria</button>
           <button class="btn" onclick="clearAll()">🗑 Limpar tudo</button>
         </div>
+      </div>
+
+      <div class="table-controls">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="searchInput" type="text" placeholder="Buscar categoria..." oninput="applyFilters()" />
+        </div>
+        <button class="sort-btn" id="sortVencBtn" onclick="toggleSortVenc()" title="Ordenar por dia de vencimento">
+          📅 Ordenar por vencimento
+        </button>
       </div>
 
       <div class="table-wrap">
@@ -509,6 +527,8 @@ let repeatMode = 'single';
 // catMeta: metadados por categoria — { [cat]: { pinned: true, pinnedValue: 100.00 } }
 // Independente do mês, é persistido em localStorage separado
 let catMeta = {};
+let sortVenc = false;    // se true, ordena por dia de vencimento
+let searchQuery = '';    // filtro de busca ativo
 
 const $ = id => document.getElementById(id);
 const monthKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -727,6 +747,10 @@ function getParcelasThisMonth(k) {
 // ---- NAVIGATION ----
 window.changeMonth = function(dir) {
   currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+dir, 1);
+  // limpa busca ao trocar de mês
+  searchQuery = '';
+  const si = document.getElementById('searchInput');
+  if(si) si.value = '';
   autoFillPinned();
   render();
 };
@@ -852,6 +876,36 @@ window.setVencimento = function(cat, val) {
   if(catMeta[cat] && Object.keys(catMeta[cat]).length === 0) delete catMeta[cat];
   saveCatMeta();
 };
+// ---- BUSCA E ORDENAÇÃO ----
+window.applyFilters = function() {
+  searchQuery = ($('searchInput')?.value || '').trim().toLowerCase();
+  render();
+};
+
+window.toggleSortVenc = function() {
+  sortVenc = !sortVenc;
+  const btn = $('sortVencBtn');
+  if(btn) btn.classList.toggle('active', sortVenc);
+  render();
+};
+
+function getFilteredSortedCats(allCats) {
+  let cats = allCats;
+  // filtro de busca
+  if(searchQuery) {
+    cats = cats.filter(c => c.toLowerCase().includes(searchQuery));
+  }
+  // ordenação por vencimento
+  if(sortVenc) {
+    cats = [...cats].sort((a, b) => {
+      const va = catMeta[a]?.vencimento || 99;
+      const vb = catMeta[b]?.vencimento || 99;
+      return va - vb;
+    });
+  }
+  return cats;
+}
+
 function render() {
   const k = monthKey(currentDate);
   $('monthLabel').textContent = fmtMonth(currentDate);
@@ -865,7 +919,13 @@ function render() {
   tbody.innerHTML = '';
   cardsEl.innerHTML = '';
 
-  allCats.forEach(cat => {
+  const visibleCats = getFilteredSortedCats(allCats);
+  if(visibleCats.length === 0 && searchQuery) {
+    tbody.innerHTML = `<tr><td colspan="5" class="no-results" style="padding:2rem;text-align:center;color:var(--muted)">Nenhuma categoria encontrada para "<strong>${searchQuery}</strong>"</td></tr>`;
+    cardsEl.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted);font-size:14px">Nenhuma categoria encontrada para "<strong>${searchQuery}</strong>"</div>`;
+    updateSummary(); return;
+  }
+  visibleCats.forEach(cat => {
     const val = obj.gastos[cat] || 0;
     const pct = total > 0 ? Math.round((val/total)*100) : 0;
     const color = getColorForCat(cat, allCats);
@@ -912,12 +972,12 @@ function render() {
         </div>
       </td>
       <td style="text-align:center;padding:6px 8px">
-        <div style="display:inline-flex;align-items:center;gap:3px">
+        <div style="display:inline-flex;align-items:center;gap:5px">
           <input class="venc-input" type="number" min="1" max="31"
-            value="${venc}" placeholder="—" data-cat="${cat}"
+            value="${venc}" placeholder="dia" data-cat="${cat}"
             onchange="window.setVencimento('${catEsc}',this.value)"
             onblur="window.setVencimento('${catEsc}',this.value)" />
-          <span style="font-size:11px;color:${venc?'var(--muted)':'#3a3a3a'}">${venc?'todo mês':'—'}</span>
+          ${venc?`<span class="venc-suffix">todo mês</span>`:''}
         </div>
       </td>
       <td class="bar-col">
